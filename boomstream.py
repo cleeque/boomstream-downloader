@@ -37,15 +37,16 @@ class App():
         self.args = parser.parse_args()
 
     def get_token(self):
-        #return "e781bc7707cbcc65d50a1bf393b982c1"
-        # In case we got URL from the root of 'mediaData'
-        #return b64decode(self.config['mediaData']['token']).decode('utf-8')
-        # In case we got URL from 'records'
-        return b64decode(self.config['mediaData']['records'][0]['token']).decode('utf-8')
+        if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
+            return b64decode(self.config['mediaData']['records'][0]['token']).decode('utf-8')
+        else:
+            return b64decode(self.config['mediaData']['token']).decode('utf-8')
 
     def get_m3u8_url(self):
-        #return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
-        return b64decode(self.config['mediaData']['records'][0]['links']['hls']).decode('utf-8')
+        if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
+            return b64decode(self.config['mediaData']['records'][0]['links']['hls']).decode('utf-8')
+        else:
+            return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
 
     def get_boomstream_config(self, page):
         """
@@ -56,7 +57,7 @@ class App():
         html = fromstring(page)
         result = None
 
-        for script in html.xpath('//script[@type="text/javascript"]'):            
+        for script in html.xpath('//script[@type="text/javascript"]'):
             m = re.search("window.boomstreamConfig = ({.*});$", script.text_content(), flags=re.M)
             if m is not None:
                 result = json.loads(m.group(1))
@@ -82,7 +83,10 @@ class App():
         return r.text
 
     def res2int(self, resolution):
-        return int(resolution.split('x')[0]) * int(resolution.split('x')[1])
+        if 'x' in resolution:
+            return int(resolution.split('x')[0]) * int(resolution.split('x')[1])
+        else:
+            return int(resolution)
 
     def extract_chunklist_urls(self, playlist):
         result = []
@@ -94,7 +98,11 @@ class App():
                 if m is not None:
                     resolution = m.group(1)
                 else:
-                    raise Exception("Could not get resolution from EXT-X-STREAM-INF")
+                    m = re.search(r'BANDWIDTH=(\d+)', line)
+                    if m is not None:
+                        resolution = m.group(1)
+                    else:
+                        raise Exception("Could not get resolution from EXT-X-STREAM-INF")
             elif resolution is not None:
                 result.append([resolution, line, self.res2int(resolution)])
                 resolution = None
@@ -107,6 +115,7 @@ class App():
                 ", ".join(i[0] for i in all_chunklists))
 
         if self.args.resolution is not None:
+            url = None
             for item in all_chunklists:
                 if item[0] == self.args.resolution:
                     url = item[1]
@@ -152,6 +161,7 @@ class App():
         for n in range(0, len(source_text), 2):
             c = int(source_text[n:n+2], 16) ^ ord(key[(int(n / 2))])
             result = result + chr(c)
+
         return result
 
     def encrypt(self, source_text, key):
@@ -201,6 +211,7 @@ class App():
             outf = os.path.join(key, "%0.5d" % i) + ".ts"
             if os.path.exists(outf):
                 i += 1
+                print("Chunk #%s exists [%s]" % (i, outf))
                 continue
             print("Downloading chunk #%s" % i)
             os.system('curl -s "%s" | openssl aes-128-cbc -K "%s" -iv "%s" -d > %s' % \
@@ -214,7 +225,10 @@ class App():
         print("Merging chunks...")
         os.system("cat %s/*.ts > %s.ts" % (key, key,))
         print("Encoding to MP4")
-        os.system("ffmpeg -i %s.ts -c copy %s.mp4" % (key, key,))
+        os.system('ffmpeg -i %s.ts -c copy "%s".mp4' % (key, self.get_title(),))
+
+    def get_title(self):
+        return self.config['entity']['title']
 
     def run(self):
         if self.args.use_cache and os.path.exists('result.html'):
@@ -228,6 +242,13 @@ class App():
             page = r.text
 
         self.config = self.get_boomstream_config(page)
+        if len(self.config['mediaData']['records']) == 0:
+            print("Video record is not available. Probably, the live streaming" \
+                  "has not finished yet. Please, try to download once the translation" \
+                  "is finished." \
+                  "If you're sure that translation is finished, please create and issue" \
+                  "in project github tracker and attach your boomstream.config.json file")
+            return 1
 
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
