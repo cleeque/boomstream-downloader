@@ -224,11 +224,14 @@ class App(object):
         # Convert the key to format suitable for openssl command-line tool
         hex_key = ''.join([f'{ord(c):02x}' for c in key])
 
+        filenames = []
+
         i = 0
         for line in chunklist.split('\n'):
             if not line.startswith('https://'):
                 continue
             outf = output_path(os.path.join(key, f"{i:05d}.ts"))
+            filenames.append(outf)
             if os.path.exists(outf) and os.path.getsize(outf) > 0:
                 i += 1
                 print(f"Chunk #{i} exists [{outf}]")
@@ -236,13 +239,14 @@ class App(object):
             print(f"Downloading chunk #{i}")
             run_bash(f'curl -s "{line}" | openssl aes-128-cbc -K "{hex_key}" -iv "{iv}" -d > {outf}')
             i += 1
+        return filenames
 
-    def merge_chunks(self, key):
+    def merge_chunks(self, filenames, key):
         """
         Merges all chunks into one file and encodes it to MP4
         """
         print("Merging chunks...")
-        run_bash(f"cat {output_path(key)}/*.ts > {output_path(key)}.ts")
+        run_bash(f"cat {' '.join(filenames)} > {output_path(key)}.ts")
         print("Encoding to MP4")
         run_bash(f'ffmpeg -i {output_path(key)}.ts -c copy "{output_path(valid_filename(self.get_title()))}".mp4')
 
@@ -287,8 +291,8 @@ class App(object):
 
         print(f'X-MEDIA-READY: {xmedia_ready}')
         iv, key = self.get_aes_key(xmedia_ready)
-        self.download_chunks(chunklist, iv, key)
-        self.merge_chunks(key)
+        filenames = self.download_chunks(chunklist, iv, key)
+        self.merge_chunks(filenames, key)
 
 if __name__ == '__main__':
     app = App()
