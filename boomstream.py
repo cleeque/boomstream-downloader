@@ -229,7 +229,7 @@ class App(object):
             if not line.startswith('https://'):
                 continue
             outf = output_path(os.path.join(key, f"{i:05d}.ts"))
-            if os.path.exists(outf):
+            if os.path.exists(outf) and os.path.getsize(outf) > 0:
                 i += 1
                 print(f"Chunk #{i} exists [{outf}]")
                 continue
