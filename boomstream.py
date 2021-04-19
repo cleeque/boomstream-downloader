@@ -59,16 +59,10 @@ class App(object):
         self.args = parser.parse_args()
 
     def get_token(self):
-        if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
-            return b64decode(self.config['mediaData']['records'][0]['token']).decode('utf-8')
-        else:
-            return b64decode(self.config['mediaData']['token']).decode('utf-8')
+        return b64decode(self.config['mediaData']['token']).decode('utf-8')
 
     def get_m3u8_url(self):
-        if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
-            return b64decode(self.config['mediaData']['records'][0]['links']['hls']).decode('utf-8')
-        else:
-            return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
+        return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
 
     def get_boomstream_config(self, page):
         """
