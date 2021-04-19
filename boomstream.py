@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import string
 import sys
 
 from base64 import b64decode
@@ -11,6 +12,10 @@ from lxml.html import fromstring
 import requests
 
 XOR_KEY = 'bla_bla_bla'
+
+OUTPUT_PATH = "output"
+
+VALID_FILENAME_CHARS = set(f" -_.(){string.ascii_letters}{string.digits}")
 
 headers = {
   'authority': 'play.boomstream.com',
@@ -24,6 +29,16 @@ headers = {
   'sec-fetch-user': '?1',
   'sec-fetch-dest': 'document',
   'accept-language': 'en-US,en;q=0.9,ru;q=0.8,es;q=0.7,de;q=0.6'}
+
+def valid_filename(s):
+    return ''.join(c for c in s if c in VALID_FILENAME_CHARS or c.isalpha())
+
+def output_path(path):
+    return os.path.join(OUTPUT_PATH, path)
+
+def ensure_folder_exists(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
 
 
 class App(object):
@@ -65,20 +80,20 @@ class App(object):
         if result is None:
             raise Exception("Could not get boomstreamConfig from the main page")
 
-        with open('boomstream.config.json', 'wt') as f:
+        with open(output_path('boomstream.config.json'), 'wt') as f:
             del result["translations"]
             f.write(json.dumps(result, ensure_ascii=False, indent=4))
 
         return result
 
     def get_playlist(self, url):
-        if self.args.use_cache and os.path.exists('boomstream.playlist.m3u8'):
-            with open('boomstream.playlist.m3u8') as f:
+        if self.args.use_cache and os.path.exists(output_path('boomstream.playlist.m3u8')):
+            with open(output_path('boomstream.playlist.m3u8')) as f:
                 return f.read()
 
         r = requests.get(url, headers=headers)
 
-        with open('boomstream.playlist.m3u8', 'wt') as f:
+        with open(output_path('boomstream.playlist.m3u8'), 'wt') as f:
             f.write(r.text)
 
         return r.text
@@ -132,13 +147,13 @@ class App(object):
         if url is None:
             raise Exception("Could not find chunklist in playlist data")
 
-        if self.args.use_cache and os.path.exists('boomstream.chunklist.m3u8'):
-            with open('boomstream.chunklist.m3u8') as f:
+        if self.args.use_cache and os.path.exists(output_path('boomstream.chunklist.m3u8')):
+            with open(output_path('boomstream.chunklist.m3u8')) as f:
                 return f.read()
 
         r = requests.get(url, headers=headers)
 
-        with open('boomstream.chunklist.m3u8', 'wt') as f:
+        with open(output_path('boomstream.chunklist.m3u8'), 'wt') as f:
             f.write(r.text)
 
         return r.text
@@ -198,18 +213,16 @@ class App(object):
         return iv, key
 
     def download_chunks(self, chunklist, iv, key):
-        i = 0
-
-        if not os.path.exists(key):
-            os.mkdir(key)
+        ensure_folder_exists(output_path(key))
 
         # Convert the key to format suitable for openssl command-line tool
         hex_key = ''.join([f'{ord(c):02x}' for c in key])
 
+        i = 0
         for line in chunklist.split('\n'):
             if not line.startswith('https://'):
                 continue
-            outf = os.path.join(key, f"{i:05d}.ts")
+            outf = output_path(os.path.join(key, f"{i:05d}.ts"))
             if os.path.exists(outf):
                 i += 1
                 print(f"Chunk #{i} exists [{outf}]")
@@ -223,20 +236,24 @@ class App(object):
         Merges all chunks into one file and encodes it to MP4
         """
         print("Merging chunks...")
-        os.system(f"cat {key}/*.ts > {key}.ts")
+        os.system(f"cat {output_path(key)}/*.ts > {output_path(key)}.ts")
         print("Encoding to MP4")
-        os.system(f'ffmpeg -i {key}.ts -c copy "{self.get_title()}".mp4')
+        os.system(f'ffmpeg -i {output_path(key)}.ts -c copy "{output_path(valid_filename(self.get_title()))}".mp4')
 
     def get_title(self):
         return self.config['entity']['title']
 
     def run(self):
-        if self.args.use_cache and os.path.exists('result.html'):
-            page = open('result.html').read()
+        ensure_folder_exists(OUTPUT_PATH)
+
+        result_path = output_path('result.html')
+
+        if self.args.use_cache and os.path.exists(result_path):
+            page = open(result_path).read()
         else:
             r = requests.get(self.args.url, headers=headers)
 
-            with open('result.html', 'wt') as f:
+            with open(result_path, 'wt') as f:
                 f.write(r.text)
 
             page = r.text
