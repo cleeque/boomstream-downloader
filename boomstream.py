@@ -45,7 +45,7 @@ class App(object):
 
     def __init__(self):
         parser = argparse.ArgumentParser(description='boomstream.com downloader')
-        parser.add_argument('--url', type=str, required=True)
+        parser.add_argument('--entity', type=str, required=True)
         parser.add_argument('--pin', type=str, required=True)
         parser.add_argument('--use-cache', action='store_true', required=False)
         parser.add_argument('--resolution', type=str, required=False)
@@ -243,15 +243,24 @@ class App(object):
     def get_title(self):
         return self.config['entity']['title']
 
+    def get_access_cookies(self):
+        r = requests.post("https://play.boomstream.com/api/subscriptions/recovery",
+                          headers={'content-type': 'application/json;charset=UTF-8'},
+                          data=f'{{"entity":"{self.args.entity}","code":"{self.args.pin}"}}')
+        cookie = json.loads(r.text)["data"]["cookie"]
+        return {cookie["name"]: cookie["value"]}
+
     def run(self):
         ensure_folder_exists(OUTPUT_PATH)
+
+        cookies = self.get_access_cookies()
 
         result_path = output_path('result.html')
 
         if self.args.use_cache and os.path.exists(result_path):
             page = open(result_path).read()
         else:
-            r = requests.get(self.args.url, headers=headers)
+            r = requests.get(f'https://play.boomstream.com/{self.args.entity}', headers=headers, cookies=cookies)
 
             with open(result_path, 'wt') as f:
                 f.write(r.text)
@@ -259,14 +268,6 @@ class App(object):
             page = r.text
 
         self.config = self.get_boomstream_config(page)
-        if len(self.config['mediaData']['records']) == 0:
-            print("Video record is not available. Probably, the live streaming" \
-                  "has not finished yet. Please, try to download once the translation" \
-                  "is finished." \
-                  "If you're sure that translation is finished, please create and issue" \
-                  "in project github tracker and attach your boomstream.config.json file")
-            return 1
-
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
 
