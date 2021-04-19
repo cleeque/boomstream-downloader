@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
+import argparse
+import json
 import os
 import re
 import sys
-import json
-import time
-import argparse
+
 from base64 import b64decode
 from lxml.html import fromstring
-
 import requests
 
 XOR_KEY = 'bla_bla_bla'
@@ -26,7 +25,8 @@ headers = {
   'sec-fetch-dest': 'document',
   'accept-language': 'en-US,en;q=0.9,ru;q=0.8,es;q=0.7,de;q=0.6'}
 
-class App():
+
+class App(object):
 
     def __init__(self):
         parser = argparse.ArgumentParser(description='boomstream.com downloader')
@@ -111,8 +111,7 @@ class App():
 
     def get_chunklist(self, playlist):
         all_chunklists = self.extract_chunklist_urls(playlist)
-        print("This video is available in the following resolutions: %s" % \
-                ", ".join(i[0] for i in all_chunklists))
+        print(f"This video is available in the following resolutions: {', '.join(i[0] for i in all_chunklists)}")
 
         if self.args.resolution is not None:
             url = None
@@ -127,7 +126,7 @@ class App():
             # If the resolution is not specified in args, pick the best one
             url = sorted(all_chunklists, key=lambda x: x[2])[-1][1]
 
-        print("URL: %s" % url)
+        print(f"URL: {url}")
 
         if url is None:
             raise Exception("Could not find chunklist in playlist data")
@@ -171,7 +170,7 @@ class App():
             key += key
 
         for i in range(0, len(source_text)):
-            result += '%0.2x' % (ord(source_text[i]) ^ ord(key[i]))
+            result += f'{ord(source_text[i]) ^ ord(key[i]):02x}'
 
         return result
 
@@ -180,20 +179,20 @@ class App():
         Returns IV and 16-byte key which will be used to decrypt video chunks
         """
         decr = self.decrypt(xmedia_ready, XOR_KEY)
-        print('Decrypted X-MEDIA-READY: %s' % decr)
+        print(f'Decrypted X-MEDIA-READY: {decr}')
 
         key = None
-        iv = ''.join(['%0.2x' % ord(c) for c in decr[20:36]])
+        iv = ''.join([f'{ord(c):02x}' for c in decr[20:36]])
 
         key_url = 'https://play.boomstream.com/api/process/' + \
                   self.encrypt(decr[0:20] + self.token, XOR_KEY)
 
-        print('key url = %s' % key_url)
+        print(f'key url = {key_url}')
 
         r = requests.get(key_url, headers=headers)
         key = r.text
-        print("IV = %s" % iv)
-        print("Key = %s" % key)
+        print(f"IV = {iv}")
+        print(f"Key = {key}")
         return iv, key
 
     def download_chunks(self, chunklist, iv, key):
@@ -203,19 +202,18 @@ class App():
             os.mkdir(key)
 
         # Convert the key to format suitable for openssl command-line tool
-        hex_key = ''.join(['%0.2x' % ord(c) for c in key])
+        hex_key = ''.join([f'{ord(c):02x}' for c in key])
 
         for line in chunklist.split('\n'):
             if not line.startswith('https://'):
                 continue
-            outf = os.path.join(key, "%0.5d" % i) + ".ts"
+            outf = os.path.join(key, f"{i:05d}.ts")
             if os.path.exists(outf):
                 i += 1
-                print("Chunk #%s exists [%s]" % (i, outf))
+                print(f"Chunk #{i} exists [{outf}]")
                 continue
-            print("Downloading chunk #%s" % i)
-            os.system('curl -s "%s" | openssl aes-128-cbc -K "%s" -iv "%s" -d > %s' % \
-                        (line, hex_key, iv, outf))
+            print(f"Downloading chunk #{i}")
+            os.system(f'curl -s "{line}" | openssl aes-128-cbc -K "{hex_key}" -iv "{iv}" -d > {outf}')
             i += 1
 
     def merge_chunks(self, key):
@@ -223,9 +221,9 @@ class App():
         Merges all chunks into one file and encodes it to MP4
         """
         print("Merging chunks...")
-        os.system("cat %s/*.ts > %s.ts" % (key, key,))
+        os.system(f"cat {key}/*.ts > {key}.ts")
         print("Encoding to MP4")
-        os.system('ffmpeg -i %s.ts -c copy "%s".mp4' % (key, self.get_title(),))
+        os.system(f'ffmpeg -i {key}.ts -c copy "{self.get_title()}".mp4')
 
     def get_title(self):
         return self.config['entity']['title']
@@ -253,15 +251,15 @@ class App():
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
 
-        print("Token = %s" % self.token)
-        print("Playlist: %s" % self.m3u8_url)
+        print(f"Token = {self.token}")
+        print(f"Playlist: {self.m3u8_url}")
 
         playlist = self.get_playlist(self.m3u8_url)
         chunklist = self.get_chunklist(playlist)
 
         xmedia_ready = self.get_xmedia_ready(chunklist)
 
-        print('X-MEDIA-READY: %s' % xmedia_ready)
+        print(f'X-MEDIA-READY: {xmedia_ready}')
         iv, key = self.get_aes_key(xmedia_ready)
         self.download_chunks(chunklist, iv, key)
         self.merge_chunks(key)
