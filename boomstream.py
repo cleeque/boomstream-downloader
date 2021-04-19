@@ -5,6 +5,7 @@ import json
 import os
 import re
 import string
+import subprocess
 import sys
 
 from base64 import b64decode
@@ -40,6 +41,11 @@ def ensure_folder_exists(path):
     if not os.path.exists(path):
         os.mkdir(path)
 
+def run_bash(command):
+    exit_code, output = subprocess.getstatusoutput(command)
+    if exit_code != 0:
+        print(output)
+        raise ValueError(f'failed with exit code {exit_code}')
 
 class App(object):
 
@@ -228,7 +234,7 @@ class App(object):
                 print(f"Chunk #{i} exists [{outf}]")
                 continue
             print(f"Downloading chunk #{i}")
-            os.system(f'curl -s "{line}" | openssl aes-128-cbc -K "{hex_key}" -iv "{iv}" -d > {outf}')
+            run_bash(f'curl -s "{line}" | openssl aes-128-cbc -K "{hex_key}" -iv "{iv}" -d > {outf}')
             i += 1
 
     def merge_chunks(self, key):
@@ -236,9 +242,9 @@ class App(object):
         Merges all chunks into one file and encodes it to MP4
         """
         print("Merging chunks...")
-        os.system(f"cat {output_path(key)}/*.ts > {output_path(key)}.ts")
+        run_bash(f"cat {output_path(key)}/*.ts > {output_path(key)}.ts")
         print("Encoding to MP4")
-        os.system(f'ffmpeg -i {output_path(key)}.ts -c copy "{output_path(valid_filename(self.get_title()))}".mp4')
+        run_bash(f'ffmpeg -i {output_path(key)}.ts -c copy "{output_path(valid_filename(self.get_title()))}".mp4')
 
     def get_title(self):
         return self.config['entity']['title']
