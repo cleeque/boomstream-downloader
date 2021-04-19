@@ -46,6 +46,7 @@ def run_bash(command):
     if exit_code != 0:
         print(output)
         raise ValueError(f'failed with exit code {exit_code}')
+    return output
 
 class App(object):
 
@@ -241,16 +242,25 @@ class App(object):
             i += 1
         return filenames
 
-    def merge_chunks(self, filenames, key):
+    def merge_chunks(self, filenames, key, expected_result_duration):
         """
         Merges all chunks into one file and encodes it to MP4
         """
         print("Merging chunks...")
         run_bash(f"cat {' '.join(filenames)} > {output_path(key)}.ts")
         print("Encoding to MP4")
+        run_bash(f'ffmpeg -nostdin -y -i {output_path(key)}.ts -c copy {output_path(key)}.mp4')
+
+        result_format = run_bash(f'ffprobe -i {output_path(key)}.mp4 -show_format')
+        result_duration = float([line[len("duration="):] for line in result_format.split('\n') if line.startswith("duration=")][0])
+        print(f"Result duration: {result_duration:.2f}")
+        print(f"Expected duration: {expected_result_duration:.2f}")
+        if abs(result_duration - expected_result_duration) > 1:
+            raise ValueError(f"unexpected result duration: {expected_result_duration:.2f} != {result_duration:.2f}")
+
         ensure_folder_exists(output_path("results"))
         result_filename = output_path(os.path.join("results", f"{valid_filename(self.get_title())}.mp4"))
-        run_bash(f'ffmpeg -i {output_path(key)}.ts -c copy "{result_filename}"')
+        os.rename(f'{output_path(key)}.mp4', result_filename)
 
     def get_title(self):
         return self.config['entity']['title']
@@ -282,6 +292,7 @@ class App(object):
         self.config = self.get_boomstream_config(page)
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
+        self.expected_result_duration = float(self.config['mediaData']['duration'])
 
         print(f"Token = {self.token}")
         print(f"Playlist: {self.m3u8_url}")
@@ -294,7 +305,7 @@ class App(object):
         print(f'X-MEDIA-READY: {xmedia_ready}')
         iv, key = self.get_aes_key(xmedia_ready)
         filenames = self.download_chunks(chunklist, iv, key)
-        self.merge_chunks(filenames, key)
+        self.merge_chunks(filenames, key, self.expected_result_duration)
 
 if __name__ == '__main__':
     app = App()
