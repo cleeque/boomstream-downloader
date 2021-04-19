@@ -73,7 +73,8 @@ class App(object):
 
     def get_playlist(self, url):
         if self.args.use_cache and os.path.exists('boomstream.playlist.m3u8'):
-            return open('boomstream.playlist.m3u8').read()
+            with open('boomstream.playlist.m3u8') as f:
+                return f.read()
 
         r = requests.get(url, headers=headers)
 
@@ -132,7 +133,8 @@ class App(object):
             raise Exception("Could not find chunklist in playlist data")
 
         if self.args.use_cache and os.path.exists('boomstream.chunklist.m3u8'):
-            return open('boomstream.chunklist.m3u8').read()
+            with open('boomstream.chunklist.m3u8') as f:
+                return f.read()
 
         r = requests.get(url, headers=headers)
 
