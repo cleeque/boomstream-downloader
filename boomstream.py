@@ -248,7 +248,9 @@ class App(object):
         print("Merging chunks...")
         run_bash(f"cat {' '.join(filenames)} > {output_path(key)}.ts")
         print("Encoding to MP4")
-        run_bash(f'ffmpeg -i {output_path(key)}.ts -c copy "{output_path(valid_filename(self.get_title()))}".mp4')
+        ensure_folder_exists(output_path("results"))
+        result_filename = output_path(os.path.join("results", f"{valid_filename(self.get_title())}.mp4"))
+        run_bash(f'ffmpeg -i {output_path(key)}.ts -c copy "{result_filename}"')
 
     def get_title(self):
         return self.config['entity']['title']
