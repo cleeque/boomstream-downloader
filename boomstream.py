@@ -53,7 +53,7 @@ class App(object):
     def __init__(self):
         parser = argparse.ArgumentParser(description='boomstream.com downloader')
         parser.add_argument('--entity', type=str, required=True)
-        parser.add_argument('--pin', type=str, required=True)
+        parser.add_argument('--pin', type=str, required=False)
         parser.add_argument('--use-cache', action='store_true', required=False)
         parser.add_argument('--resolution', type=str, required=False)
         self.args = parser.parse_args()
@@ -260,9 +260,12 @@ class App(object):
         return self.config['entity']['title']
 
     def get_access_cookies(self):
+        pin = self.args.pin
+        if pin is None:
+            return {}
         r = requests.post("https://play.boomstream.com/api/subscriptions/recovery",
                           headers={'content-type': 'application/json;charset=UTF-8'},
-                          data=f'{{"entity":"{self.args.entity}","code":"{self.args.pin}"}}')
+                          data=f'{{"entity":"{self.args.entity}","code":"{pin}"}}')
         response = json.loads(r.text)
         if "data" not in response or "cookie" not in response["data"]:
             if "errors" not in response or "code" not in response:
@@ -290,6 +293,11 @@ class App(object):
             page = r.text
 
         self.config = self.get_boomstream_config(page)
+        if "mediaData" not in self.config or "duration" not in self.config['mediaData']:
+            raise ValueError(
+                "Video config is not available. Probably, the live streaming has not finished yet, or you use "
+                "an incorrect pin code. If you're sure that translation is finished and pin code is correct, please "
+                "create an issue in project github tracker and attach your boomstream.config.json file.")
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
         self.expected_result_duration = float(self.config['mediaData']['duration'])

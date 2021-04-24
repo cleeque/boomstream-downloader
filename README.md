@@ -13,20 +13,18 @@ using session token and the second part of `#EXT-X-MEDIA-READY`.
 
 ## Usage
 
-Spicify `--entity` and `--pin` in command line arguments:
+Command line arguments:
 
-```bash
---entity TiAR7aDs --pin 123-456-789
-```
-`entity` value can be found in URL like https://play.boomstream.com/TiAR7aDs
+`--entity` (required) - value can be found in URL like https://play.boomstream.com/TiAR7aDs
 
-You can also specify a resolution using `--resolution` command line argument:
+`--pin` - required only for content protected with a pin code
 
+`--resolution` - video resolution. If not specified, the video with a highest one will be downloaded
+
+Excample:
 ```bash
 --entity TiAR7aDs --pin 123-456-789 --resolution "640x360"
 ```
-
-If resolution is not specified, the video with a highest one will be dowloaded.
 
 ## Requirements
 
