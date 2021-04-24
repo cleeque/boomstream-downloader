@@ -249,7 +249,7 @@ class App(object):
         result_duration = float([line[len("duration="):] for line in result_format.split('\n') if line.startswith("duration=")][0])
         print(f"Result duration: {result_duration:.2f}")
         print(f"Expected duration: {expected_result_duration:.2f}")
-        if abs(result_duration - expected_result_duration) > 1:
+        if abs(result_duration - expected_result_duration) > 2:
             raise ValueError(f"unexpected result duration: {expected_result_duration:.2f} != {result_duration:.2f}")
 
         ensure_folder_exists(output_path("results"))
