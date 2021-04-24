@@ -263,7 +263,13 @@ class App(object):
         r = requests.post("https://play.boomstream.com/api/subscriptions/recovery",
                           headers={'content-type': 'application/json;charset=UTF-8'},
                           data=f'{{"entity":"{self.args.entity}","code":"{self.args.pin}"}}')
-        cookie = json.loads(r.text)["data"]["cookie"]
+        response = json.loads(r.text)
+        if "data" not in response or "cookie" not in response["data"]:
+            if "errors" not in response or "code" not in response:
+                raise ValueError(f"unexpected response on authorization: {r.text}")
+            else:
+                raise ValueError(f"authorization failed: {response['code']} {response['errors']}")
+        cookie = response["data"]["cookie"]
         return {cookie["name"]: cookie["value"]}
 
     def run(self):
