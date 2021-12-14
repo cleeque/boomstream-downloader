@@ -34,17 +34,18 @@ class App():
         parser.add_argument('--pin', type=str, required=True)
         parser.add_argument('--use-cache', action='store_true', required=False)
         parser.add_argument('--resolution', type=str, required=False)
+        parser.add_argument('--num', type=int, required=False, default=0, help='Provide number of video 0, 1, 2...')
         self.args = parser.parse_args()
 
     def get_token(self):
         if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
-            return b64decode(self.config['mediaData']['records'][0]['token']).decode('utf-8')
+            return b64decode(self.config['mediaData']['records'][self.args.num]['token']).decode('utf-8')
         else:
             return b64decode(self.config['mediaData']['token']).decode('utf-8')
 
     def get_m3u8_url(self):
         if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
-            return b64decode(self.config['mediaData']['records'][0]['links']['hls']).decode('utf-8')
+            return b64decode(self.config['mediaData']['records'][self.args.num]['links']['hls']).decode('utf-8')
         else:
             return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
 
