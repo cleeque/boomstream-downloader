@@ -43,10 +43,7 @@ class App():
             return b64decode(self.config['mediaData']['token']).decode('utf-8')
 
     def get_m3u8_url(self):
-        if 'records' in self.config['mediaData'] and len(self.config['mediaData']['records']) > 0:
-            return b64decode(self.config['mediaData']['records'][0]['links']['hls']).decode('utf-8')
-        else:
-            return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
+        return b64decode(self.config['mediaData']['links']['hls']).decode('utf-8')
 
     def get_boomstream_config(self, page):
         """
@@ -242,13 +239,11 @@ class App():
             page = r.text
 
         self.config = self.get_boomstream_config(page)
-        if len(self.config['mediaData']['records']) == 0:
-            print("Video record is not available. Probably, the live streaming" \
-                  "has not finished yet. Please, try to download once the translation" \
-                  "is finished." \
-                  "If you're sure that translation is finished, please create and issue" \
-                  "in project github tracker and attach your boomstream.config.json file")
-            return 1
+        if "mediaData" not in self.config or "duration" not in self.config['mediaData']:
+            raise ValueError(
+                "Video config is not available. Probably, the live streaming has not finished yet, or you use "
+                "an incorrect pin code. If you're sure that translation is finished and pin code is correct, please "
+                "create an issue in project github tracker and attach your boomstream.config.json file.")
 
         self.token = self.get_token()
         self.m3u8_url = self.get_m3u8_url()
